@@ -1,0 +1,30 @@
+{
+  "startYear": 2018,
+  "endYear": null,
+  "visited": {
+    "2018": {
+      "countries": ["FRA", "DEU", "ITA"],
+      "states": []
+    },
+    "2019": {
+      "countries": ["JPN", "KOR", "CHN"],
+      "states": ["California", "Nevada"]
+    },
+    "2021": {
+      "countries": ["GBR", "NLD", "BEL"],
+      "states": []
+    },
+    "2022": {
+      "countries": ["USA", "MEX", "CAN"],
+      "states": ["New York", "Florida", "Texas"]
+    },
+    "2023": {
+      "countries": ["AUS", "NZL"],
+      "states": []
+    },
+    "2024": {
+      "countries": ["BRA", "ARG"],
+      "states": []
+    }
+  }
+}

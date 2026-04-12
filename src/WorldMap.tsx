@@ -1,17 +1,23 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import {
   ComposableMap,
-  Geography,
   Marker,
   ZoomableGroup,
   useGeographies,
+  useMapContext,
 } from "react-simple-maps";
 import { geoCentroid, geoArea } from "d3-geo";
 import polylabel from "polylabel";
 import { labelSize } from "./labelSize";
+import { useConfig, useVisited, resolveEndYear } from "./useConfig";
 import { Timeline } from "./Timeline";
 import { ZoomControls } from "./ZoomControls";
 import "./WorldMap.css";
+
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 8;
+const ZOOM_STEP = 1.5;
+const ANIM_MS   = 350;
 
 const WORLD_URL =
   "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson";
@@ -29,10 +35,13 @@ const palettes = {
 type PaletteName = keyof typeof palettes;
 type Palette = typeof palettes[PaletteName];
 
+
 interface GeoLayerProps {
   geography: string | object;
-  getName: (props: Record<string, string>) => string;
-  showLabel: (geo: { properties: Record<string, string> }, zoom: number) => boolean;
+  getName:     (props: Record<string, string>) => string;
+  getKey:      (props: Record<string, string>) => string;
+  visitedKeys?: Set<string>;
+  showLabel:   (geo: { properties: Record<string, string> }, zoom: number) => boolean;
   palette: Palette;
   zoom: number;
   onTooltip: (name: string) => void;
@@ -66,52 +75,66 @@ function polylabelCenter(geo: any): [number, number] {
   return geoCentroid(geo);
 }
 
-function geoStyle(palette: Palette, zoom: number) {
-  const sw = 0.5 / zoom;
-  return {
-    default: { fill: palette.land,      stroke: palette.secondary, strokeWidth: sw, outline: "none" },
-    hover:   { fill: palette.secondary, stroke: palette.secondary, strokeWidth: sw, outline: "none" },
-    pressed: { fill: palette.secondary, stroke: palette.secondary, strokeWidth: sw, outline: "none" },
-  };
-}
-
-
-function GeoLayer({ geography, getName, showLabel, palette, zoom, onTooltip }: GeoLayerProps) {
+function GeoLayer({ geography, getName, getKey, visitedKeys, showLabel, palette, zoom, onTooltip }: GeoLayerProps) {
   const { geographies } = useGeographies({ geography });
-  const style = geoStyle(palette, zoom);
+  const { path } = useMapContext();
+  const [hovered, setHovered] = useState<string | null>(null);
+  const sw = 0.5 / zoom;
+
+  // Centroid and label-size are stable per geography — compute once, not per render.
+  const geoMeta = useMemo(() => {
+    const m = new Map<string, { centroid: [number, number]; fs: number }>();
+    for (const geo of geographies) {
+      m.set(geo.rsmKey, { centroid: polylabelCenter(geo), fs: labelSize(geo) });
+    }
+    return m;
+  }, [geographies]);
+
+  // Dev: warn if visited keys never match any loaded geography
+  useEffect(() => {
+    if (!import.meta.env.DEV || !visitedKeys || visitedKeys.size === 0 || geographies.length === 0) return;
+    const matched = geographies.some((g) => visitedKeys.has(getKey(g.properties as Record<string, string>)));
+    if (!matched) console.warn("[GeoLayer] no visitedKeys matched. Check ISO codes in config.", [...visitedKeys]);
+  }, [geographies, visitedKeys, getKey]);
 
   return (
     <>
-      {/* Group 1: fills + borders — data iterated once */}
       <g>
         {geographies.map((geo) => {
-          const name = getName(geo.properties as Record<string, string>);
+          const props   = geo.properties as Record<string, string>;
+          const name    = getName(props);
+          const key     = getKey(props);
+          const visited = !!visitedKeys?.has(key);
+          const isHover = hovered === geo.rsmKey;
+          const fill    = isHover || visited ? palette.secondary : palette.land;
           return (
-            <Geography
+            <path
               key={geo.rsmKey}
-              geography={geo}
-              onMouseEnter={() => onTooltip(name)}
-              onMouseLeave={() => onTooltip("")}
-              style={style}
+              d={path(geo) ?? ""}
+              fill={fill}
+              stroke={palette.secondary}
+              strokeWidth={sw}
+              style={{ outline: "none", cursor: "default" }}
+              onMouseEnter={() => { setHovered(geo.rsmKey); onTooltip(name); }}
+              onMouseLeave={() => { setHovered(null);       onTooltip("");    }}
             />
           );
         })}
       </g>
 
-      {/* Group 2: labels always above every border */}
       <g pointerEvents="none">
         {geographies.map((geo) => {
           if (!showLabel(geo, zoom)) return null;
           const name = getName(geo.properties as Record<string, string>);
-          const centroid = polylabelCenter(geo);
-          const fs = labelSize(geo);
+          const meta = geoMeta.get(geo.rsmKey);
+          if (!meta) return null;
           return (
-            <Marker key={`lbl-${geo.rsmKey}`} coordinates={centroid as [number, number]}>
+            <Marker key={`lbl-${geo.rsmKey}`} coordinates={meta.centroid}>
               <text
                 className="wt-geo-label"
                 textAnchor="middle"
                 dominantBaseline="central"
-                style={{ fontSize: fs, fill: palette.text }}
+                style={{ fontSize: meta.fs, fill: palette.text }}
               >
                 {name}
               </text>
@@ -131,16 +154,25 @@ export default function WorldMap() {
   });
   const [paletteName, setPaletteName] = useState<PaletteName>("signature");
   const [showLabels, setShowLabels] = useState(true);
-  const [year, setYear] = useState(2024);
+
+  const config  = useConfig();
+  const endYear = resolveEndYear(config);
+  const [year, setYear] = useState<number | null>(null);
+
+  // Once config loads, start at startYear so only that year's visits are highlighted
+  useEffect(() => {
+    if (config) setYear(config.startYear);
+  }, [config]);
+
+  const activeYear = year ?? endYear;
+  const visited = useVisited(config, activeYear);
 
   const palette = palettes[paletteName];
   const zoom = position.zoom;
 
-  const MIN_ZOOM = 1;
-  const MAX_ZOOM = 8;
-  const rafRef     = useRef<number>(0);
-  const posRef     = useRef(position); // always current, no stale-closure issues
-  useEffect(() => { posRef.current = position; }, [position]);
+  const rafRef = useRef<number>(0);
+  const posRef = useRef(position);
+  posRef.current = position; // keep ref current without an effect
 
   const animateTo = useCallback((
     targetZoom:   number,
@@ -151,8 +183,8 @@ export default function WorldMap() {
     const t0 = performance.now();
 
     const frame = (now: number) => {
-      const t      = Math.min((now - t0) / 350, 1);
-      const eased  = 1 - Math.pow(1 - t, 3); // ease-out cubic
+      const t     = Math.min((now - t0) / ANIM_MS, 1);
+      const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
       setPosition({
         zoom: z0 + (targetZoom - z0) * eased,
         coordinates: [
@@ -165,9 +197,9 @@ export default function WorldMap() {
     rafRef.current = requestAnimationFrame(frame);
   }, []);
 
-  const zoomIn  = () => animateTo(Math.min(posRef.current.zoom * 1.5, MAX_ZOOM), posRef.current.coordinates);
-  const zoomOut = () => animateTo(Math.max(posRef.current.zoom / 1.5, MIN_ZOOM), posRef.current.coordinates);
-  const reset   = () => animateTo(1, [0, 0]);
+  const zoomIn  = useCallback(() => animateTo(Math.min(posRef.current.zoom * ZOOM_STEP, MAX_ZOOM), posRef.current.coordinates), [animateTo]);
+  const zoomOut = useCallback(() => animateTo(Math.max(posRef.current.zoom / ZOOM_STEP, MIN_ZOOM), posRef.current.coordinates), [animateTo]);
+  const reset   = useCallback(() => animateTo(1, [0, 0]), [animateTo]);
 
   const worldLabel = (geo: { properties: Record<string, string> }) => {
     const pop = Number(geo.properties.POP_EST) || 0;
@@ -236,6 +268,8 @@ export default function WorldMap() {
           <GeoLayer
             geography={WORLD_URL}
             getName={(p) => p.NAME || p.ADMIN || ""}
+            getKey={(p) => p.ISO_A3 || p.ADM0_A3 || ""}
+            visitedKeys={visited.countries}
             showLabel={worldLabel}
             palette={palette}
             zoom={zoom}
@@ -244,6 +278,8 @@ export default function WorldMap() {
           <GeoLayer
             geography={US_STATES_URL}
             getName={(p) => p.name || ""}
+            getKey={(p) => p.name || ""}
+            visitedKeys={visited.states}
             showLabel={stateLabel}
             palette={palette}
             zoom={zoom}
@@ -253,7 +289,9 @@ export default function WorldMap() {
       </ComposableMap>
 
       <Timeline
-        value={year}
+        min={config?.startYear}
+        max={endYear}
+        value={activeYear}
         onChange={setYear}
         palette={palette}
       />

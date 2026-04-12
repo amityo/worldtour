@@ -117,8 +117,8 @@
 .wt-timeline-ticks {
   position: absolute;
   top: 10px;
-  left: 0;
-  right: 0;
+  left: 8px;   /* = half thumb width, matches browser range-input thumb offset */
+  right: 8px;
   height: 18px;
   pointer-events: none;
 }

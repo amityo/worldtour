@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 
 interface TimelineProps {
   min?: number;
@@ -10,8 +10,15 @@ interface TimelineProps {
 
 const MIN_DEFAULT = 1900;
 const MAX_DEFAULT = 2024;
-const MAJOR_STEP  = 25;
-const MINOR_STEP  = 5;
+
+function tickSteps(range: number): { major: number; minor: number } {
+  if (range > 200) return { major: 50, minor: 10 };
+  if (range > 100) return { major: 25, minor: 5  };
+  if (range > 50)  return { major: 10, minor: 2  };
+  if (range > 20)  return { major: 5,  minor: 1  };
+  if (range > 10)  return { major: 2,  minor: 1  };
+  return           { major: 1,  minor: 1  };
+}
 
 export function Timeline({
   min = MIN_DEFAULT,
@@ -20,12 +27,17 @@ export function Timeline({
   onChange,
   palette,
 }: TimelineProps) {
-  const pct = ((value - min) / (max - min)) * 100;
+  const pct   = ((value - min) / (max - min)) * 100;
+  const range = max - min;
+  const { major: majorStep, minor: minorStep } = tickSteps(range);
 
-  const ticks: { year: number; major: boolean }[] = [];
-  for (let y = min; y <= max; y++) {
-    if (y % MINOR_STEP === 0) ticks.push({ year: y, major: y % MAJOR_STEP === 0 });
-  }
+  const ticks = useMemo(() => {
+    const result: { year: number; major: boolean }[] = [];
+    for (let y = min; y <= max; y++) {
+      if (y % minorStep === 0) result.push({ year: y, major: y % majorStep === 0 });
+    }
+    return result;
+  }, [min, max, majorStep, minorStep]);
 
   const trackStyle: React.CSSProperties = {
     background: `linear-gradient(to right, ${palette.secondary} ${pct}%, ${palette.text}22 ${pct}%)`,
