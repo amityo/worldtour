@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import {
   ComposableMap,
   Geography,
@@ -9,6 +9,8 @@ import {
 import { geoCentroid, geoArea } from "d3-geo";
 import polylabel from "polylabel";
 import { labelSize } from "./labelSize";
+import { Timeline } from "./Timeline";
+import { ZoomControls } from "./ZoomControls";
 import "./WorldMap.css";
 
 const WORLD_URL =
@@ -129,9 +131,43 @@ export default function WorldMap() {
   });
   const [paletteName, setPaletteName] = useState<PaletteName>("signature");
   const [showLabels, setShowLabels] = useState(true);
+  const [year, setYear] = useState(2024);
 
   const palette = palettes[paletteName];
   const zoom = position.zoom;
+
+  const MIN_ZOOM = 1;
+  const MAX_ZOOM = 8;
+  const rafRef     = useRef<number>(0);
+  const posRef     = useRef(position); // always current, no stale-closure issues
+  useEffect(() => { posRef.current = position; }, [position]);
+
+  const animateTo = useCallback((
+    targetZoom:   number,
+    targetCoords: [number, number]
+  ) => {
+    cancelAnimationFrame(rafRef.current);
+    const { zoom: z0, coordinates: c0 } = posRef.current;
+    const t0 = performance.now();
+
+    const frame = (now: number) => {
+      const t      = Math.min((now - t0) / 350, 1);
+      const eased  = 1 - Math.pow(1 - t, 3); // ease-out cubic
+      setPosition({
+        zoom: z0 + (targetZoom - z0) * eased,
+        coordinates: [
+          c0[0] + (targetCoords[0] - c0[0]) * eased,
+          c0[1] + (targetCoords[1] - c0[1]) * eased,
+        ],
+      });
+      if (t < 1) rafRef.current = requestAnimationFrame(frame);
+    };
+    rafRef.current = requestAnimationFrame(frame);
+  }, []);
+
+  const zoomIn  = () => animateTo(Math.min(posRef.current.zoom * 1.5, MAX_ZOOM), posRef.current.coordinates);
+  const zoomOut = () => animateTo(Math.max(posRef.current.zoom / 1.5, MIN_ZOOM), posRef.current.coordinates);
+  const reset   = () => animateTo(1, [0, 0]);
 
   const worldLabel = (geo: { properties: Record<string, string> }) => {
     const pop = Number(geo.properties.POP_EST) || 0;
@@ -215,6 +251,19 @@ export default function WorldMap() {
           />
         </ZoomableGroup>
       </ComposableMap>
+
+      <Timeline
+        value={year}
+        onChange={setYear}
+        palette={palette}
+      />
+
+      <ZoomControls
+        onZoomIn={zoomIn}
+        onZoomOut={zoomOut}
+        onReset={reset}
+        palette={palette}
+      />
     </div>
   );
 }
