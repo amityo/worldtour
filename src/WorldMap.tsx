@@ -1,12 +1,13 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   ComposableMap,
-  Geographies,
   Geography,
   Marker,
   ZoomableGroup,
+  useGeographies,
 } from "react-simple-maps";
 import { geoCentroid } from "d3-geo";
+import { labelSize } from "./labelSize";
 import "./WorldMap.css";
 
 const WORLD_URL =
@@ -43,48 +44,56 @@ function geoStyle(palette: Palette, zoom: number) {
   };
 }
 
+
 function GeoLayer({ geography, getName, showLabel, palette, zoom, onTooltip }: GeoLayerProps) {
+  const { geographies } = useGeographies({ geography });
   const style = geoStyle(palette, zoom);
-  const fs = 2;
 
   return (
-    <Geographies geography={geography}>
-      {({ geographies }) =>
-        geographies.map((geo) => {
+    <>
+      {/* Group 1: fills + borders — data iterated once */}
+      <g>
+        {geographies.map((geo) => {
+          const name = getName(geo.properties as Record<string, string>);
+          return (
+            <Geography
+              key={geo.rsmKey}
+              geography={geo}
+              onMouseEnter={() => onTooltip(name)}
+              onMouseLeave={() => onTooltip("")}
+              style={style}
+            />
+          );
+        })}
+      </g>
+
+      {/* Group 2: labels always above every border */}
+      <g pointerEvents="none">
+        {geographies.map((geo) => {
+          if (!showLabel(geo, zoom)) return null;
           const name = getName(geo.properties as Record<string, string>);
           const centroid = geoCentroid(geo);
-
+          const fs = labelSize(geo);
           return (
-            <g key={geo.rsmKey}>
-              <Geography
-                geography={geo}
-                onMouseEnter={() => onTooltip(name)}
-                onMouseLeave={() => onTooltip("")}
-                style={style}
-              />
-              {showLabel(geo, zoom) && (
-                <Marker coordinates={centroid as [number, number]}>
-                  <text
-                    className="wt-geo-label"
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    style={{ fontSize: fs, fill: palette.text }}
-                  >
-                    {name}
-                  </text>
-                </Marker>
-              )}
-            </g>
+            <Marker key={`lbl-${geo.rsmKey}`} coordinates={centroid as [number, number]}>
+              <text
+                className="wt-geo-label"
+                textAnchor="middle"
+                dominantBaseline="central"
+                style={{ fontSize: fs, fill: palette.text }}
+              >
+                {name}
+              </text>
+            </Marker>
           );
-        })
-      }
-    </Geographies>
+        })}
+      </g>
+    </>
   );
 }
 
 export default function WorldMap() {
   const [tooltip, setTooltip] = useState("");
-  const [usStates, setUsStates] = useState(null);
   const [position, setPosition] = useState<{ coordinates: [number, number]; zoom: number }>({
     coordinates: [0, 0],
     zoom: 1,
@@ -94,12 +103,6 @@ export default function WorldMap() {
 
   const palette = palettes[paletteName];
   const zoom = position.zoom;
-
-  useEffect(() => {
-    fetch(US_STATES_URL)
-      .then((res) => res.json())
-      .then((data) => setUsStates(data));
-  }, []);
 
   const worldLabel = (geo: { properties: Record<string, string> }, z: number) => {
     const pop = Number(geo.properties.POP_EST) || 0;
@@ -173,16 +176,14 @@ export default function WorldMap() {
             zoom={zoom}
             onTooltip={setTooltip}
           />
-          {usStates && (
-            <GeoLayer
-              geography={usStates}
-              getName={(p) => p.name || ""}
-              showLabel={stateLabel}
-              palette={palette}
-              zoom={zoom}
-              onTooltip={setTooltip}
-            />
-          )}
+          <GeoLayer
+            geography={US_STATES_URL}
+            getName={(p) => p.name || ""}
+            showLabel={stateLabel}
+            palette={palette}
+            zoom={zoom}
+            onTooltip={setTooltip}
+          />
         </ZoomableGroup>
       </ComposableMap>
     </div>
