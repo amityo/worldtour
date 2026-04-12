@@ -6,7 +6,8 @@ import {
   ZoomableGroup,
   useGeographies,
 } from "react-simple-maps";
-import { geoCentroid } from "d3-geo";
+import { geoCentroid, geoArea } from "d3-geo";
+import polylabel from "polylabel";
 import { labelSize } from "./labelSize";
 import "./WorldMap.css";
 
@@ -33,6 +34,34 @@ interface GeoLayerProps {
   palette: Palette;
   zoom: number;
   onTooltip: (name: string) => void;
+}
+
+// Pole of inaccessibility — better visual center than centroid for irregular shapes.
+// For MultiPolygon, runs on the largest component by spherical area.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function polylabelCenter(geo: any): [number, number] {
+  const geom = geo.geometry;
+  if (!geom) return geoCentroid(geo);
+
+  if (geom.type === "Polygon") {
+    const pt = polylabel(geom.coordinates as number[][][]);
+    return [pt[0], pt[1]];
+  }
+
+  if (geom.type === "MultiPolygon") {
+    const largest = (geom.coordinates as number[][][][]).reduce(
+      (best: number[][][], rings: number[][][]) => {
+        const a = geoArea({ type: "Feature", geometry: { type: "Polygon", coordinates: rings }, properties: null });
+        const b = geoArea({ type: "Feature", geometry: { type: "Polygon", coordinates: best  }, properties: null });
+        return a > b ? rings : best;
+      },
+      geom.coordinates[0] as number[][][]
+    );
+    const pt = polylabel(largest);
+    return [pt[0], pt[1]];
+  }
+
+  return geoCentroid(geo);
 }
 
 function geoStyle(palette: Palette, zoom: number) {
@@ -72,7 +101,7 @@ function GeoLayer({ geography, getName, showLabel, palette, zoom, onTooltip }: G
         {geographies.map((geo) => {
           if (!showLabel(geo, zoom)) return null;
           const name = getName(geo.properties as Record<string, string>);
-          const centroid = geoCentroid(geo);
+          const centroid = polylabelCenter(geo);
           const fs = labelSize(geo);
           return (
             <Marker key={`lbl-${geo.rsmKey}`} coordinates={centroid as [number, number]}>
