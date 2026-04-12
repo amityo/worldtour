@@ -168,9 +168,6 @@ export default function WorldMap() {
                             fontFamily: "system-ui",
                             fontSize: fs,
                             fill: palette.text,
-                            stroke: palette.background,
-                            strokeWidth: 3 / zoom,
-                            paintOrder: "stroke",
                             pointerEvents: "none",
                             userSelect: "none",
                           }}
