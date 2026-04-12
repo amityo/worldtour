@@ -7,14 +7,11 @@ import {
   ZoomableGroup,
 } from "react-simple-maps";
 import { geoCentroid } from "d3-geo";
+import "./WorldMap.css";
 
-// Natural Earth 110m — includes POP_EST, NAME, etc.
 const WORLD_URL =
-  "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
+  "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson";
 const US_STATES_URL = "https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json";
-
-// Swap WORLD_URL to a Natural Earth GeoJSON (e.g. ne_110m_admin_0_countries.geojson)
-// if you need POP_EST-based filtering/sizing.
 
 const palettes = {
   signature: { background: "#87CEEB", land: "#FFF8DC", secondary: "#FFDEAD", text: "#800000" },
@@ -26,12 +23,63 @@ const palettes = {
 } as const;
 
 type PaletteName = keyof typeof palettes;
+type Palette = typeof palettes[PaletteName];
 
-function labelFontSize(pop: number | undefined): number {
-  if (!pop) return 10;
-  if (pop > 100_000_000) return 14;
-  if (pop > 50_000_000) return 12;
-  return 10;
+interface GeoLayerProps {
+  geography: string | object;
+  getName: (props: Record<string, string>) => string;
+  showLabel: (geo: { properties: Record<string, string> }, zoom: number) => boolean;
+  palette: Palette;
+  zoom: number;
+  onTooltip: (name: string) => void;
+}
+
+function geoStyle(palette: Palette, zoom: number) {
+  const sw = 0.5 / zoom;
+  return {
+    default: { fill: palette.land,      stroke: palette.secondary, strokeWidth: sw, outline: "none" },
+    hover:   { fill: palette.secondary, stroke: palette.secondary, strokeWidth: sw, outline: "none" },
+    pressed: { fill: palette.secondary, stroke: palette.secondary, strokeWidth: sw, outline: "none" },
+  };
+}
+
+function GeoLayer({ geography, getName, showLabel, palette, zoom, onTooltip }: GeoLayerProps) {
+  const style = geoStyle(palette, zoom);
+  const fs = 2;
+
+  return (
+    <Geographies geography={geography}>
+      {({ geographies }) =>
+        geographies.map((geo) => {
+          const name = getName(geo.properties as Record<string, string>);
+          const centroid = geoCentroid(geo);
+
+          return (
+            <g key={geo.rsmKey}>
+              <Geography
+                geography={geo}
+                onMouseEnter={() => onTooltip(name)}
+                onMouseLeave={() => onTooltip("")}
+                style={style}
+              />
+              {showLabel(geo, zoom) && (
+                <Marker coordinates={centroid as [number, number]}>
+                  <text
+                    className="wt-geo-label"
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    style={{ fontSize: fs, fill: palette.text }}
+                  >
+                    {name}
+                  </text>
+                </Marker>
+              )}
+            </g>
+          );
+        })
+      }
+    </Geographies>
+  );
 }
 
 export default function WorldMap() {
@@ -53,76 +101,63 @@ export default function WorldMap() {
       .then((data) => setUsStates(data));
   }, []);
 
+  const worldLabel = (geo: { properties: Record<string, string> }, z: number) => {
+    const pop = Number(geo.properties.POP_EST) || 0;
+    return showLabels && z > -1 && (pop === 0 || pop >= 5_000_000);
+  };
+
+  const stateLabel = (_geo: { properties: Record<string, string> }, z: number) =>
+    showLabels && z > -1;
+
   return (
-    <div style={{ width: "100%", height: "100vh", background: palette.background }}>
-      {/* Tooltip */}
+    <div
+      className="wt-root"
+      style={{ background: palette.background }}
+    >
       <div
+        className="wt-tooltip"
         style={{
-          position: "fixed",
-          top: 10,
-          left: 10,
           background: palette.background,
           color: palette.text,
-          padding: "6px 10px",
           border: `1px solid ${palette.text}44`,
-          borderRadius: "8px",
-          pointerEvents: "none",
-          fontFamily: "sans-serif",
-          fontSize: 14,
         }}
       >
         {tooltip || "Hover a country/state"}
       </div>
 
-      {/* Controls */}
       <div
+        className="wt-controls"
         style={{
-          position: "fixed",
-          top: 10,
-          right: 10,
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
           background: palette.background,
-          padding: "6px 10px",
           border: `1px solid ${palette.text}44`,
-          borderRadius: "8px",
         }}
       >
         <button
+          className="wt-label-btn"
           title="Toggle labels"
           onClick={() => setShowLabels((v) => !v)}
           style={{
-            fontSize: 12,
-            fontFamily: "sans-serif",
-            padding: "2px 8px",
-            borderRadius: 4,
             border: `1px solid ${palette.text}66`,
             background: showLabels ? palette.text : "transparent",
             color: showLabels ? palette.background : palette.text,
-            cursor: "pointer",
           }}
         >
           Labels
         </button>
 
-        <div style={{ width: 1, height: 18, background: `${palette.text}33` }} />
+        <div className="wt-divider" style={{ background: `${palette.text}33` }} />
 
         {(Object.keys(palettes) as PaletteName[]).map((name) => (
           <button
             key={name}
+            className="wt-swatch"
             title={name}
             onClick={() => setPaletteName(name)}
             style={{
-              width: 22,
-              height: 22,
-              borderRadius: "50%",
               background: palettes[name].land,
               border: name === paletteName
                 ? `3px solid ${palette.text}`
                 : `2px solid ${palettes[name].text}66`,
-              cursor: "pointer",
-              padding: 0,
             }}
           />
         ))}
@@ -130,106 +165,24 @@ export default function WorldMap() {
 
       <ComposableMap projection="geoEqualEarth" style={{ background: palette.background }}>
         <ZoomableGroup center={position.coordinates} zoom={zoom} onMoveEnd={setPosition}>
-
-          {/* Countries */}
-          <Geographies geography={WORLD_URL}>
-            {({ geographies }) =>
-              geographies.map((geo) => {
-                const name: string = geo.properties.name || geo.properties.ADMIN || "";
-                const pop: number | undefined = geo.properties.POP_EST as number | undefined;
-                const centroid = geoCentroid(geo);
-
-                // Skip label for tiny countries; keep Geography regardless
-                const showThisLabel =
-                  showLabels &&
-                  zoom > 2 &&
-                  (pop === undefined || pop >= 5_000_000);
-
-                const fs = labelFontSize(pop) / zoom;
-
-                return (
-                  <g key={geo.rsmKey}>
-                    <Geography
-                      geography={geo}
-                      onMouseEnter={() => setTooltip(name)}
-                      onMouseLeave={() => setTooltip("")}
-                      style={{
-                        default: { fill: palette.land, outline: "none" },
-                        hover:   { fill: palette.secondary, outline: "none" },
-                        pressed: { fill: palette.secondary, outline: "none" },
-                      }}
-                    />
-                    {showThisLabel && (
-                      <Marker coordinates={centroid as [number, number]}>
-                        <text
-                          textAnchor="middle"
-                          dominantBaseline="central"
-                          style={{
-                            fontFamily: "system-ui",
-                            fontSize: fs,
-                            fill: palette.text,
-                            pointerEvents: "none",
-                            userSelect: "none",
-                          }}
-                        >
-                          {name}
-                        </text>
-                      </Marker>
-                    )}
-                  </g>
-                );
-              })
-            }
-          </Geographies>
-
-          {/* US States overlay */}
+          <GeoLayer
+            geography={WORLD_URL}
+            getName={(p) => p.NAME || p.ADMIN || ""}
+            showLabel={worldLabel}
+            palette={palette}
+            zoom={zoom}
+            onTooltip={setTooltip}
+          />
           {usStates && (
-            <Geographies geography={usStates}>
-              {({ geographies }) =>
-                geographies.map((geo) => {
-                  const name: string = geo.properties.name || "";
-                  const centroid = geoCentroid(geo);
-                  const fs = 10 / zoom;
-
-                  return (
-                    <g key={geo.rsmKey}>
-                      <Geography
-                        geography={geo}
-                        onMouseEnter={() => setTooltip(name)}
-                        onMouseLeave={() => setTooltip("")}
-                        style={{
-                          default: { fill: palette.land, outline: "none" },
-                          hover:   { fill: palette.secondary, outline: "none" },
-                          pressed: { fill: palette.secondary, outline: "none" },
-                        }}
-                      />
-                      {showLabels && zoom > 4 && (
-                        <Marker coordinates={centroid as [number, number]}>
-                          <text
-                            textAnchor="middle"
-                            dominantBaseline="central"
-                            style={{
-                              fontFamily: "system-ui",
-                              fontSize: fs,
-                              fill: palette.text,
-                              stroke: palette.background,
-                              strokeWidth: 3 / zoom,
-                              paintOrder: "stroke",
-                              pointerEvents: "none",
-                              userSelect: "none",
-                            }}
-                          >
-                            {name}
-                          </text>
-                        </Marker>
-                      )}
-                    </g>
-                  );
-                })
-              }
-            </Geographies>
+            <GeoLayer
+              geography={usStates}
+              getName={(p) => p.name || ""}
+              showLabel={stateLabel}
+              palette={palette}
+              zoom={zoom}
+              onTooltip={setTooltip}
+            />
           )}
-
         </ZoomableGroup>
       </ComposableMap>
     </div>
