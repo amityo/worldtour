@@ -128,18 +128,18 @@ export default function WorldMap() {
     zoom: 1,
   });
   const [paletteName, setPaletteName] = useState<PaletteName>("signature");
-  const [showLabels, setShowLabels] = useState(false);
+  const [showLabels, setShowLabels] = useState(true);
 
   const palette = palettes[paletteName];
   const zoom = position.zoom;
 
-  const worldLabel = (geo: { properties: Record<string, string> }, z: number) => {
+  const worldLabel = (geo: { properties: Record<string, string> }) => {
     const pop = Number(geo.properties.POP_EST) || 0;
-    return showLabels && z > -1 && (pop === 0 || pop >= 5_000_000);
+    return showLabels && (pop === 0 || pop >= 5_000_000);
   };
 
-  const stateLabel = (_geo: { properties: Record<string, string> }, z: number) =>
-    showLabels && z > -1;
+  const stateLabel = (_geo: { properties: Record<string, string> }) =>
+    showLabels;
 
   return (
     <div
