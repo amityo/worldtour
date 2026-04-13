@@ -148,15 +148,19 @@ function GeoLayer({ geography, getName, getKey, visitedKeys, visitedYears, showL
 }
 
 export default function WorldMap() {
+  const isTouch = navigator.maxTouchPoints > 0;
+  const initialZoom = isTouch ? 3.5 : 1;
+
   const [tooltip, setTooltip] = useState<{ name: string; years?: number[] } | null>(null);
   const [mouse, setMouse] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [position, setPosition] = useState<{ coordinates: [number, number]; zoom: number }>({
     coordinates: [0, 0],
-    zoom: 1,
+    zoom: initialZoom,
   });
   const [paletteName, setPaletteName] = useState<PaletteName>("signature");
   const [showLabels, setShowLabels] = useState(true);
   const [showAll, setShowAll] = useState(false);
+  const [showControls, setShowControls] = useState(true);
 
   const config      = useConfig();
   const endYear     = resolveEndYear(config);
@@ -251,51 +255,70 @@ export default function WorldMap() {
           border: `1px solid ${palette.text}44`,
         }}
       >
-        <button
-          className="wt-label-btn"
-          title="Toggle labels"
-          onClick={() => setShowLabels((v) => !v)}
-          style={{
-            border: `1px solid ${palette.text}66`,
-            background: showLabels ? palette.text : "transparent",
-            color: showLabels ? palette.background : palette.text,
-          }}
-        >
-          Labels
-        </button>
+        {showControls && (
+          <>
+            <button
+              className="wt-label-btn"
+              title="Toggle labels"
+              onClick={() => setShowLabels((v) => !v)}
+              style={{
+                border: `1px solid ${palette.text}66`,
+                background: showLabels ? palette.text : "transparent",
+                color: showLabels ? palette.background : palette.text,
+              }}
+            >
+              Labels
+            </button>
+
+            <button
+              className="wt-label-btn"
+              title="Show all visited countries"
+              onClick={() => setShowAll((v) => !v)}
+              style={{
+                border: `1px solid ${palette.text}66`,
+                background: showAll ? palette.text : "transparent",
+                color: showAll ? palette.background : palette.text,
+              }}
+            >
+              All
+            </button>
+
+            <div className="wt-divider" style={{ background: `${palette.text}33` }} />
+
+            {(Object.keys(palettes) as PaletteName[]).map((name) => (
+              <button
+                key={name}
+                className="wt-swatch"
+                title={name}
+                onClick={() => setPaletteName(name)}
+                style={{
+                  background: palettes[name].land,
+                  border: name === paletteName
+                    ? `3px solid ${palette.text}`
+                    : `2px solid ${palettes[name].text}66`,
+                }}
+              />
+            ))}
+
+            <div className="wt-divider" style={{ background: `${palette.text}33` }} />
+          </>
+        )}
 
         <button
-          className="wt-label-btn"
-          title="Show all visited countries"
-          onClick={() => setShowAll((v) => !v)}
+          className="wt-label-btn wt-toggle-btn"
+          title={showControls ? "Hide options" : "Show options"}
+          onClick={() => setShowControls((v) => !v)}
           style={{
             border: `1px solid ${palette.text}66`,
-            background: showAll ? palette.text : "transparent",
-            color: showAll ? palette.background : palette.text,
+            background: "transparent",
+            color: palette.text,
           }}
         >
-          All
+          {showControls ? "✕" : "⚙"}
         </button>
-
-        <div className="wt-divider" style={{ background: `${palette.text}33` }} />
-
-        {(Object.keys(palettes) as PaletteName[]).map((name) => (
-          <button
-            key={name}
-            className="wt-swatch"
-            title={name}
-            onClick={() => setPaletteName(name)}
-            style={{
-              background: palettes[name].land,
-              border: name === paletteName
-                ? `3px solid ${palette.text}`
-                : `2px solid ${palettes[name].text}66`,
-            }}
-          />
-        ))}
       </div>
 
-      <ComposableMap projection="geoEqualEarth" style={{ background: palette.background }}>
+      <ComposableMap projection="geoEqualEarth" style={{ background: palette.background, width: "100%", height: "100%" }}>
         <ZoomableGroup center={position.coordinates} zoom={zoom} onMoveEnd={setPosition}>
           <GeoLayer
             geography={WORLD_URL}
@@ -330,12 +353,14 @@ export default function WorldMap() {
         palette={palette}
       />
 
-      <ZoomControls
-        onZoomIn={zoomIn}
-        onZoomOut={zoomOut}
-        onReset={reset}
-        palette={palette}
-      />
+      {!isTouch && (
+        <ZoomControls
+          onZoomIn={zoomIn}
+          onZoomOut={zoomOut}
+          onReset={reset}
+          palette={palette}
+        />
+      )}
 
       <div className="wt-credits" style={{ color: palette.text }}>
         <a className="gh-link" href="https://github.com/amityo/worldtour" target="_blank" rel="noreferrer">

@@ -52,6 +52,11 @@ html, body {
   cursor: pointer;
 }
 
+.wt-toggle-btn {
+  font-size: 14px;
+  padding: 2px 6px;
+}
+
 .wt-swatch {
   width: 22px;
   height: 22px;
@@ -80,6 +85,22 @@ html, body {
   gap: 14px;
   font-family: sans-serif;
 }
+
+@media (max-width: 600px) {
+  .wt-timeline {
+    width: calc(100vw - 48px);
+    bottom: 44px;
+  }
+}
+
+/* landscape phones */
+@media (orientation: landscape) and (max-height: 600px) {
+  .wt-timeline {
+    width: calc(100vw - 48px);
+    bottom: 44px;
+  }
+}
+
 
 .wt-timeline-year {
   font-size: 20px;
@@ -191,6 +212,16 @@ html, body {
   align-items: center;
 }
 
+@media (max-width: 600px) {
+  .wt-credits {
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 14px;
+    white-space: nowrap;
+    font-size: 11px;
+  }
+}
+
 /* ── Zoom controls ────────────────────────────────────────── */
 .wt-zoom-controls {
   position: fixed;
@@ -202,4 +233,33 @@ html, body {
   padding: 6px;
   border-radius: 10px;
   width: 80px;
+}
+
+@media (max-width: 600px) {
+  .wt-zoom-controls {
+    display: none;
+  }
+}
+
+/* ── Controls panel ───────────────────────────────────────── */
+@media (max-width: 600px) {
+  .wt-controls {
+    top: 8px;
+    right: 8px;
+    gap: 6px;
+    padding: 5px 8px;
+    max-width: calc(100vw - 16px);
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .wt-swatch {
+    width: 18px;
+    height: 18px;
+  }
+
+  .wt-label-btn {
+    font-size: 11px;
+    padding: 2px 6px;
+  }
 }
