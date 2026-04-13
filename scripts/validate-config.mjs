@@ -10,36 +10,21 @@
 import { readFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
+import countries from "i18n-iso-countries";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const CONFIG_PATH = resolve(ROOT, "public/worldtour.config.json");
 
-// ── ISO 3166-1 alpha-3 ───────────────────────────────────────────────────────
-const VALID_COUNTRIES = new Set([
-  "AFG","ALB","DZA","AND","AGO","ATG","ARG","ARM","AUS","AUT","AZE",
-  "BHS","BHR","BGD","BRB","BLR","BEL","BLZ","BEN","BTN","BOL","BIH",
-  "BWA","BRA","BRN","BGR","BFA","BDI","CPV","KHM","CMR","CAN","CAF",
-  "TCD","CHL","CHN","COL","COM","COD","COG","CRI","CIV","HRV","CUB",
-  "CYP","CZE","DNK","DJI","DOM","ECU","EGY","SLV","GNQ","ERI","EST",
-  "SWZ","ETH","FJI","FIN","FRA","GAB","GMB","GEO","DEU","GHA","GRC",
-  "GRD","GTM","GIN","GNB","GUY","HTI","HND","HUN","ISL","IND","IDN",
-  "IRN","IRQ","IRL","ISR","ITA","JAM","JPN","JOR","KAZ","KEN","KIR",
-  "PRK","KOR","XKX","KWT","KGZ","LAO","LVA","LBN","LSO","LBR","LBY",
-  "LIE","LTU","LUX","MDG","MWI","MYS","MDV","MLI","MLT","MHL","MRT",
-  "MUS","MEX","FSM","MDA","MCO","MNG","MNE","MAR","MOZ","MMR","NAM",
-  "NRU","NPL","NLD","NZL","NIC","NER","NGA","MKD","NOR","OMN","PAK",
-  "PLW","PAN","PNG","PRY","PER","PHL","POL","PRT","QAT","ROU","RUS",
-  "RWA","KNA","LCA","VCT","WSM","SMR","STP","SAU","SEN","SRB","SYC",
-  "SLE","SGP","SVK","SVN","SLB","SOM","ZAF","SSD","ESP","LKA","SDN",
-  "SUR","SWE","CHE","SYR","TWN","TJK","TZA","THA","TLS","TGO","TON",
-  "TTO","TUN","TUR","TKM","TUV","UGA","UKR","ARE","GBR","USA","URY",
-  "UZB","VUT","VEN","VNM","YEM","ZMB","ZWE",
-  // Territories / special entries common in Natural Earth
-  "ATA","GRL","ESH","PSE","SOL","KOS","SCR",
-  // Natural Earth uses -99 or ADM0_A3 for some disputed/unrecognised territories;
-  // the codes below cover the most common ones that appear in ne_110m data.
-  "TWN","SOM","KOS","SOL",
-]);
+// ── Country resolution: accepts ISO alpha-3 OR full English name ─────────────
+/** Resolve a config entry to ISO alpha-3, or null if unrecognised. */
+function resolveCountry(entry) {
+  // Already an alpha-3 code
+  if (countries.isValid(entry)) return entry;
+  // Try resolving as an English name → alpha-2 → alpha-3
+  const alpha2 = countries.getAlpha2Code(entry, "en");
+  if (alpha2) return countries.alpha2ToAlpha3(alpha2);
+  return null;
+}
 
 // ── US states (us-atlas title-cased names) ───────────────────────────────────
 const VALID_STATES = new Set([
@@ -67,8 +52,8 @@ let errors = 0;
 
 for (const [year, entry] of Object.entries(config.visited ?? {})) {
   for (const code of entry.countries ?? []) {
-    if (!VALID_COUNTRIES.has(code)) {
-      console.error(`validate-config: unknown country code "${code}" in year ${year}`);
+    if (!resolveCountry(code)) {
+      console.error(`validate-config: unknown country "${code}" in year ${year} (expected ISO alpha-3 or English name)`);
       errors++;
     }
   }

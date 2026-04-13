@@ -1,12 +1,10 @@
 {
-  "startYear": 2018,
+  "startYear": 1996,
   "endYear": null,
   "visited": {
     "2018": {
       "countries": [
-        "FRA",
-        "DEU",
-        "ITA"
+        "USA"
       ],
       "states": []
     },

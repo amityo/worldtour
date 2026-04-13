@@ -1,6 +1,13 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
 .wt-root {
   width: 100%;
   height: 100vh;
+  overflow: hidden;
 }
 
 .wt-tooltip {
@@ -151,6 +158,37 @@
   font-size: 10px;
   white-space: nowrap;
   opacity: 0.7;
+}
+
+/* ── Credits ──────────────────────────────────────────────── */
+.wt-credits {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: sans-serif;
+  font-size: 12px;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.wt-credits:hover {
+  opacity: 1;
+}
+
+.wt-credits a {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.gh-link svg {
+  width: 1rem;
+  height: 1rem;
+  display: flex;
+  align-items: center;
 }
 
 /* ── Zoom controls ────────────────────────────────────────── */
