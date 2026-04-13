@@ -9,7 +9,7 @@ import {
 import { geoCentroid, geoArea } from "d3-geo";
 import polylabel from "polylabel";
 import { labelSize } from "./labelSize";
-import { useConfig, useVisited, resolveEndYear } from "./useConfig";
+import { useConfig, useVisited, useAllVisitedYears, resolveEndYear } from "./useConfig";
 import { Timeline } from "./Timeline";
 import { ZoomControls } from "./ZoomControls";
 import "./WorldMap.css";
@@ -38,13 +38,14 @@ type Palette = typeof palettes[PaletteName];
 
 interface GeoLayerProps {
   geography: string | object;
-  getName:     (props: Record<string, string>) => string;
-  getKey:      (props: Record<string, string>) => string;
+  getName:      (props: Record<string, string>) => string;
+  getKey:       (props: Record<string, string>) => string;
   visitedKeys?: Set<string>;
-  showLabel:   (geo: { properties: Record<string, string> }, zoom: number) => boolean;
+  visitedYears?: Map<string, number[]>;
+  showLabel:    (geo: { properties: Record<string, string> }, zoom: number) => boolean;
   palette: Palette;
   zoom: number;
-  onTooltip: (name: string) => void;
+  onTooltip: (name: string, years?: number[]) => void;
 }
 
 // Pole of inaccessibility — better visual center than centroid for irregular shapes.
@@ -75,7 +76,7 @@ function polylabelCenter(geo: any): [number, number] {
   return geoCentroid(geo);
 }
 
-function GeoLayer({ geography, getName, getKey, visitedKeys, showLabel, palette, zoom, onTooltip }: GeoLayerProps) {
+function GeoLayer({ geography, getName, getKey, visitedKeys, visitedYears, showLabel, palette, zoom, onTooltip }: GeoLayerProps) {
   const { geographies } = useGeographies({ geography });
   const { path } = useMapContext();
   const [hovered, setHovered] = useState<string | null>(null);
@@ -115,8 +116,8 @@ function GeoLayer({ geography, getName, getKey, visitedKeys, showLabel, palette,
               stroke={palette.secondary}
               strokeWidth={sw}
               style={{ outline: "none", cursor: "default" }}
-              onMouseEnter={() => { setHovered(geo.rsmKey); onTooltip(name); }}
-              onMouseLeave={() => { setHovered(null);       onTooltip("");    }}
+              onMouseEnter={() => { setHovered(geo.rsmKey); onTooltip(name, visitedYears?.get(key)); }}
+              onMouseLeave={() => { setHovered(null);       onTooltip("");                           }}
             />
           );
         })}
@@ -147,7 +148,8 @@ function GeoLayer({ geography, getName, getKey, visitedKeys, showLabel, palette,
 }
 
 export default function WorldMap() {
-  const [tooltip, setTooltip] = useState("");
+  const [tooltip, setTooltip] = useState<{ name: string; years?: number[] } | null>(null);
+  const [mouse, setMouse] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [position, setPosition] = useState<{ coordinates: [number, number]; zoom: number }>({
     coordinates: [0, 0],
     zoom: 1,
@@ -155,8 +157,9 @@ export default function WorldMap() {
   const [paletteName, setPaletteName] = useState<PaletteName>("signature");
   const [showLabels, setShowLabels] = useState(true);
 
-  const config  = useConfig();
-  const endYear = resolveEndYear(config);
+  const config      = useConfig();
+  const endYear     = resolveEndYear(config);
+  const allVisited  = useAllVisitedYears(config);
   const [year, setYear] = useState<number | null>(null);
 
   // Once config loads, start at startYear so only that year's visits are highlighted
@@ -213,17 +216,27 @@ export default function WorldMap() {
     <div
       className="wt-root"
       style={{ background: palette.background }}
+      onMouseMove={(e) => setMouse({ x: e.clientX, y: e.clientY })}
     >
-      <div
-        className="wt-tooltip"
-        style={{
-          background: palette.background,
-          color: palette.text,
-          border: `1px solid ${palette.text}44`,
-        }}
-      >
-        {tooltip || "Hover a country/state"}
-      </div>
+      {tooltip && (
+        <div
+          className="wt-tooltip"
+          style={{
+            left: mouse.x + 14,
+            top:  mouse.y + 14,
+            background: palette.secondary,
+            color: palette.text,
+            border: `1px solid ${palette.text}44`,
+          }}
+        >
+          <span>{tooltip.name}</span>
+          {tooltip.years && (
+            <span className="wt-tooltip-years" style={{ color: `${palette.text}99` }}>
+              {tooltip.years.join(" · ")}
+            </span>
+          )}
+        </div>
+      )}
 
       <div
         className="wt-controls"
@@ -270,20 +283,22 @@ export default function WorldMap() {
             getName={(p) => p.NAME || p.ADMIN || ""}
             getKey={(p) => p.ISO_A3 || p.ADM0_A3 || ""}
             visitedKeys={visited.countries}
+            visitedYears={allVisited.countries}
             showLabel={worldLabel}
             palette={palette}
             zoom={zoom}
-            onTooltip={setTooltip}
+            onTooltip={(name, years) => name ? setTooltip({ name, years }) : setTooltip(null)}
           />
           <GeoLayer
             geography={US_STATES_URL}
             getName={(p) => p.name || ""}
             getKey={(p) => p.name || ""}
             visitedKeys={visited.states}
+            visitedYears={allVisited.states}
             showLabel={stateLabel}
             palette={palette}
             zoom={zoom}
-            onTooltip={setTooltip}
+            onTooltip={(name, years) => name ? setTooltip({ name, years }) : setTooltip(null)}
           />
         </ZoomableGroup>
       </ComposableMap>

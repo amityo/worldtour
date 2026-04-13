@@ -5,13 +5,20 @@
 
 .wt-tooltip {
   position: fixed;
-  top: 10px;
-  left: 10px;
   padding: 6px 10px;
   border-radius: 8px;
   pointer-events: none;
   font-family: sans-serif;
   font-size: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  white-space: nowrap;
+  z-index: 10;
+}
+
+.wt-tooltip-years {
+  font-size: 11px;
 }
 
 .wt-controls {
