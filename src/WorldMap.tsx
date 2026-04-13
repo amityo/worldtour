@@ -161,6 +161,7 @@ export default function WorldMap() {
   const [showLabels, setShowLabels] = useState(true);
   const [showAll, setShowAll] = useState(false);
   const [showControls, setShowControls] = useState(true);
+  const [showStats, setShowStats] = useState(false);
 
   const config      = useConfig();
   const endYear     = resolveEndYear(config);
@@ -179,6 +180,17 @@ export default function WorldMap() {
     states:    new Set(allVisited.states.keys()),
   }), [allVisited]);
   const visited = showAll ? allVisitedKeys : visitedYear;
+
+  const stats = useMemo(() => {
+    const totalVisits = Object.values(config.visited).reduce(
+      (sum, e) => sum + (e.countries?.length ?? 0), 0
+    );
+    return {
+      uniqueCountries: allVisited.countries.size,
+      totalVisits,
+      uniqueStates: allVisited.states.size,
+    };
+  }, [config, allVisited]);
 
   const palette = palettes[paletteName];
   const zoom = position.zoom;
@@ -283,6 +295,19 @@ export default function WorldMap() {
               All
             </button>
 
+            <button
+              className="wt-label-btn"
+              title="Statistics"
+              onClick={() => setShowStats((v) => !v)}
+              style={{
+                border: `1px solid ${palette.text}66`,
+                background: showStats ? palette.text : "transparent",
+                color: showStats ? palette.background : palette.text,
+              }}
+            >
+              Stats
+            </button>
+
             <div className="wt-divider" style={{ background: `${palette.text}33` }} />
 
             {(Object.keys(palettes) as PaletteName[]).map((name) => (
@@ -360,6 +385,32 @@ export default function WorldMap() {
           onReset={reset}
           palette={palette}
         />
+      )}
+
+      {showStats && (
+        <div
+          className="wt-stats"
+          style={{
+            background: palette.background,
+            border: `1px solid ${palette.text}44`,
+            color: palette.text,
+          }}
+        >
+          <div className="wt-stats-row">
+            <span>Unique countries</span>
+            <strong>{stats.uniqueCountries}</strong>
+          </div>
+          <div className="wt-stats-row">
+            <span>Total visits</span>
+            <strong>{stats.totalVisits}</strong>
+          </div>
+          {stats.uniqueStates > 0 && (
+            <div className="wt-stats-row">
+              <span>US states</span>
+              <strong>{stats.uniqueStates}</strong>
+            </div>
+          )}
+        </div>
       )}
 
       <div className="wt-credits" style={{ color: palette.text }}>
