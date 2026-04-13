@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
+import { useMemo } from "react";
+import configData from "../public/worldtour.config.json";
 
 export interface WorldTourConfig {
   startYear: number;
@@ -9,17 +10,8 @@ export interface WorldTourConfig {
   }>;
 }
 
-export function useConfig() {
-  const [config, setConfig] = useState<WorldTourConfig | null>(null);
-
-  useEffect(() => {
-    fetch("/worldtour.config.json")
-      .then((r) => r.json())
-      .then(setConfig)
-      .catch(() => setConfig(null));
-  }, []);
-
-  return config;
+export function useConfig(): WorldTourConfig {
+  return configData as WorldTourConfig;
 }
 
 const CURRENT_YEAR = new Date().getFullYear();

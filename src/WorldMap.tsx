@@ -148,7 +148,7 @@ function GeoLayer({ geography, getName, getKey, visitedKeys, visitedYears, showL
 }
 
 export default function WorldMap() {
-  const isTouch = navigator.maxTouchPoints > 0;
+  const isTouch = window.matchMedia("(pointer: coarse)").matches;
   const initialZoom = isTouch ? 3.5 : 1;
 
   const [tooltip, setTooltip] = useState<{ name: string; years?: number[] } | null>(null);
