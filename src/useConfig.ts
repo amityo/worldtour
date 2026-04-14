@@ -72,7 +72,8 @@ export function useAllVisitedYears(config: WorldTourConfig | null): {
       const year = Number(yearStr);
       for (const c of entry.countries ?? []) {
         if (!countries.has(c)) countries.set(c, []);
-        countries.get(c)!.push(year);
+        const arr = countries.get(c)!;
+        if (arr[arr.length - 1] !== year) arr.push(year);
       }
       for (const s of entry.states ?? []) {
         if (!states.has(s)) states.set(s, []);
