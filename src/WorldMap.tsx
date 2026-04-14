@@ -348,7 +348,8 @@ export default function WorldMap() {
           <GeoLayer
             geography={WORLD_URL}
             getName={(p) => p.NAME || p.ADMIN || ""}
-            getKey={(p) => (p.ISO_A3 && p.ISO_A3 !== "-99" ? p.ISO_A3 : p.ADM0_A3) || ""} {/* Natural Earth sets ISO_A3="-99" for some countries (e.g. France, Norway) — fall back to ADM0_A3 */}
+            // Natural Earth sets ISO_A3="-99" for some countries (e.g. France, Norway) — fall back to ADM0_A3
+            getKey={(p) => (p.ISO_A3 && p.ISO_A3 !== "-99" ? p.ISO_A3 : p.ADM0_A3) || ""} 
             visitedKeys={visited.countries}
             visitedYears={allVisited.countries}
             showLabel={worldLabel}
