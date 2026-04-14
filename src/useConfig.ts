@@ -1,5 +1,9 @@
 import { useMemo } from "react";
-import configData from "../public/worldtour.config.json";
+import countries from "i18n-iso-countries";
+import en from "i18n-iso-countries/langs/en.json";
+import configData from "./worldtour.config.json";
+
+countries.registerLocale(en);
 
 export interface WorldTourConfig {
   startYear: number;
@@ -10,8 +14,28 @@ export interface WorldTourConfig {
   }>;
 }
 
+function resolveAlpha3(entry: string): string {
+  if (countries.isValid(entry)) return entry;
+  const alpha2 = countries.getAlpha2Code(entry, "en");
+  if (alpha2) return countries.alpha2ToAlpha3(alpha2) ?? entry;
+  return entry;
+}
+
+function normalizeConfig(raw: typeof configData): WorldTourConfig {
+  const visited: WorldTourConfig["visited"] = {};
+  for (const [year, entry] of Object.entries(raw.visited)) {
+    visited[year] = {
+      ...entry,
+      countries: entry.countries?.map(resolveAlpha3),
+    };
+  }
+  return { ...raw, visited };
+}
+
+const normalizedConfig = normalizeConfig(configData);
+
 export function useConfig(): WorldTourConfig {
-  return configData as WorldTourConfig;
+  return normalizedConfig;
 }
 
 const CURRENT_YEAR = new Date().getFullYear();

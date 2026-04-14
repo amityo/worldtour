@@ -13,7 +13,7 @@ import { fileURLToPath } from "url";
 import countries from "i18n-iso-countries";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const CONFIG_PATH = resolve(ROOT, "public/worldtour.config.json");
+const CONFIG_PATH = resolve(ROOT, "src/worldtour.config.json");
 
 // ── Country resolution: accepts ISO alpha-3 OR full English name ─────────────
 /** Resolve a config entry to ISO alpha-3, or null if unrecognised. */
